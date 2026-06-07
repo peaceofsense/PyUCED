@@ -1,4 +1,4 @@
-# Day-Ahead MILP Unit Commitment & Economic Dispatch — Germany (DE-LU)
+# Day-Ahead MILP Unit Commitment & Economic Dispatch - Germany (DE-LU)
 
 A Mixed-Integer Linear Program (MILP) that answers:
 
@@ -76,8 +76,8 @@ python src/plot.py              # step 3: regenerate plots only (requires step 2
 ### Problem Type
 This is a **Unit Commitment (UC) + Economic Dispatch (ED)** problem, a standard formulation in power systems operations. It simultaneously decides:
 
-- **Commitment** — which generators to switch on or off at each time step (binary decision)
-- **Dispatch** — how much power each committed generator should produce (continuous decision)
+- **Commitment** - which generators to switch on or off at each time step (binary decision)
+- **Dispatch** - how much power each committed generator should produce (continuous decision)
 
 The objective is to minimize total operating cost (variable generation cost + startup costs) while serving the forecast demand at every interval.
 
@@ -88,14 +88,14 @@ The objective is to minimize total operating cost (variable generation cost + st
 - **Timezone:** CET/CEST (as reported by ENTSO-E)
 
 ### Bidding Zone
-- **DE-LU** — the Germany/Luxembourg electricity market area (as defined by ENTSO-E)
+- **DE-LU** - the Germany/Luxembourg electricity market area (as defined by ENTSO-E)
 
 ### Technology Treatment
 
 The model splits all generation into three categories:
 
 #### 1. Must-Run Fleet (taken directly from ENTSO-E data, not optimized)
-These technologies are treated as fixed injections — their output is read from the actual generation data and subtracted from total demand to form the **residual demand** that the MILP must serve.
+These technologies are treated as fixed injections - their output is read from the actual generation data and subtracted from total demand to form the **residual demand** that the MILP must serve.
 
 | Internal Label | ENTSO-E Source Type(s) |
 |---|---|
@@ -108,7 +108,7 @@ These technologies are treated as fixed injections — their output is read from
 | `Nuclear` | Nuclear |
 | `Other` | Other, Fossil Peat, Marine |
 
-**Why must-run?** Wind, solar, and run-of-river hydro cannot be freely dispatched — their output is determined by weather and hydrology. Nuclear and geothermal have very high startup costs and are typically base-loaded. Treating them as fixed simplifies the model while remaining realistic for a single-day horizon.
+**Why must-run?** Wind, solar, and run-of-river hydro cannot be freely dispatched - their output is determined by weather and hydrology. Nuclear and geothermal have very high startup costs and are typically base-loaded. Treating them as fixed simplifies the model while remaining realistic for a single-day horizon.
 
 #### 2. Dispatchable Fleet (MILP-optimized)
 These nine technology classes are jointly optimized with binary commitment variables, minimum/maximum output bounds, ramp rate limits, and startup costs.
@@ -166,26 +166,26 @@ min  Σ_{g,t} mc[g] · p[g,t]          (variable generation cost)
    + Σ_t     10,000 · sv[t]           (slack penalty)
 ```
 
-The slack penalty (10,000 €/MWh) is far above any generator marginal cost, so the solver only uses it when the residual demand cannot be served by the available fleet — it should be zero in a feasible solution.
+The slack penalty (10,000 €/MWh) is far above any generator marginal cost, so the solver only uses it when the residual demand cannot be served by the available fleet - it should be zero in a feasible solution.
 
 ### Constraints
 
-**C1 — Demand balance** (residual demand = dispatchable output ± pumped storage + slack):
+**C1 - Demand balance** (residual demand = dispatchable output ± pumped storage + slack):
 ```
 Σ_g p[g,t]  +  ps_gen[t]  -  ps_pump[t]  +  sv[t]  =  residual[t]    ∀ t
 ```
 
-**C2 — Minimum output** (generator cannot produce below pmin if committed):
+**C2 - Minimum output** (generator cannot produce below pmin if committed):
 ```
 p[g,t]  ≥  pmin[g] · u[g,t]    ∀ g, t
 ```
 
-**C3 — Maximum output** (generator cannot exceed pmax):
+**C3 - Maximum output** (generator cannot exceed pmax):
 ```
 p[g,t]  ≤  pmax[g] · u[g,t]    ∀ g, t
 ```
 
-**C4 — Startup logic** (y[g,t] = 1 whenever unit transitions from OFF to ON):
+**C4 - Startup logic** (y[g,t] = 1 whenever unit transitions from OFF to ON):
 ```
 y[g,t]  ≥  u[g,t] - u[g,t-1]    ∀ g, t > 0
 y[g,0]  ≥  u[g,0]                ∀ g ∉ WARM_START    (cold-start: pay startup if committed at t=0)
@@ -193,41 +193,41 @@ y[g,0]  =  0                     ∀ g ∈ WARM_START     (pre-running: no start
 ```
 See [Initial Unit State (Warm-Start)](#initial-unit-state-warm-start) for which units are in `WARM_START`.
 
-**C5 — Ramp-up limit** (big-M relaxation at startup):
+**C5 - Ramp-up limit** (big-M relaxation at startup):
 ```
 p[g,t] - p[g,t-1]  ≤  ramp[g] + Pmax[g]·(1−u[g,t−1])    ∀ g, t > 0
 ```
 
-**C6 — Ramp-down limit** (big-M relaxation at shutdown):
+**C6 - Ramp-down limit** (big-M relaxation at shutdown):
 ```
 p[g,t-1] - p[g,t]  ≤  ramp[g] + Pmax[g]·(1−u[g,t])      ∀ g, t > 0
 ```
 
-**C7 — Shutdown indicator** (z[g,t] = 1 whenever unit goes from ON at t-1 to OFF at t):
+**C7 - Shutdown indicator** (z[g,t] = 1 whenever unit goes from ON at t-1 to OFF at t):
 ```
 z[g,t]  ≥  u[g,t-1] - u[g,t]    ∀ g, t > 0
 ```
 
-**C8 — Minimum up-time** (once started, must remain ON for `min_up` intervals):
+**C8 - Minimum up-time** (once started, must remain ON for `min_up` intervals):
 ```
 Σ_{s=t-min_up+1}^{t} y[g,s]  ≤  u[g,t]    ∀ g, t ≥ min_up - 1
 ```
 If any startup occurred in the last `min_up` intervals, the unit must be ON now.
 
-**C9 — Minimum down-time** (once shut down, must remain OFF for `min_dn` intervals):
+**C9 - Minimum down-time** (once shut down, must remain OFF for `min_dn` intervals):
 ```
 Σ_{s=t-min_dn+1}^{t} z[g,s]  ≤  1 - u[g,t]    ∀ g, t ≥ min_dn
 ```
 If any shutdown occurred in the last `min_dn` intervals, the unit must be OFF now.
 
-**C10 — Pumped storage SoC dynamics** (energy balance per interval):
+**C10 - Pumped storage SoC dynamics** (energy balance per interval):
 ```
 ps_soc[t]  =  ps_soc[t-1]  +  η · ps_pump[t]/4  -  ps_gen[t]/4    ∀ t
 ```
 where `η = 0.78` is the pumping efficiency and `/4` converts 15-min power to energy (MWh).  
 Initial SoC: `ps_soc[-1] = PS_SOC_INIT = PS_SOC_MAX × 0.5`
 
-**C11 — Pumped storage cannot generate while pumping**:
+**C11 - Pumped storage cannot generate while pumping**:
 ```
 ps_gen[t]   ≤  PS_MAX_GEN  · ps_bin[t]        ∀ t
 ps_pump[t]  ≤  PS_MAX_PUMP · (1 - ps_bin[t])  ∀ t
@@ -241,7 +241,7 @@ These are deliberate simplifications. Understanding them is important for interp
 
 | Limitation | Explanation |
 |---|---|
-| **No transmission network** | The model is a single-node "copper-plate" model — it assumes Germany's grid has no internal congestion and all generators can freely serve all demand. Real market prices vary by region (nodal or zonal pricing). |
+| **No transmission network** | The model is a single-node "copper-plate" model - it assumes Germany's grid has no internal congestion and all generators can freely serve all demand. Real market prices vary by region (nodal or zonal pricing). |
 | **No cross-border flows** | Imports and exports via interconnectors (France, Denmark, Poland, etc.) are ignored. In reality DE-LU is a net importer or exporter depending on the hour, which affects dispatch. |
 | **Minimum up/down times are approximate** | Minimum run and off times are included (e.g. 6 hours for lignite, 4 hours for hard coal) but are representative estimates. Real plant-level values vary by unit age, cold/warm/hot start state, and regulatory constraints. |
 | **No spinning or operating reserves** | Real dispatch includes reserve requirements (primary, secondary, tertiary). The model only enforces exact demand balance; it does not hold capacity back for uncertainty. |
@@ -254,10 +254,10 @@ These are deliberate simplifications. Understanding them is important for interp
 | **No demand response or flexible demand** | Industrial curtailment, EV charging flexibility, and demand-side management are not modeled. |
 | **No intraday or balancing market** | The model reflects a stylised day-ahead market clearing only. Balancing actions and redispatch are not captured. |
 | **Fossil Gas mapped entirely to Gas_CCGT** | The ENTSO-E "Fossil Gas" category includes both CCGT and OCGT plants. This model treats the entire class as CCGT (high efficiency, lower cost), which may underestimate peaking costs. A separate `Gas_Peak` category is included with assumed OCGT parameters. |
-| **No end-of-day storage terminal constraint** | Pumped storage SoC is free to reach any level by the final interval. The solver will tend to fully discharge storage toward midnight to reduce cost — a classic horizon-gaming artifact. A real model would enforce `ps_soc[95] ≥ ps_soc_init` or optimise across multiple days. |
+| **No end-of-day storage terminal constraint** | Pumped storage SoC is free to reach any level by the final interval. The solver will tend to fully discharge storage toward midnight to reduce cost - a classic horizon-gaming artifact. A real model would enforce `ps_soc[95] ≥ ps_soc_init` or optimise across multiple days. |
 | **Flat marginal cost (no part-load efficiency)** | Each generator's marginal cost is constant regardless of output level. Real thermal plants have higher heat rates at part load, so true MC increases as output falls below the design point. This simplification is standard in aggregated UC models but overstates efficiency at low dispatch levels. |
 | **One aggregated unit per technology class** | Germany's grid contains hundreds of individual plants. Modeling each technology as a single unit means the binary commitment variable has no physical plant-level meaning and the pmin/pmax bounds represent the entire fleet, not individual unit constraints. |
-| **`avg_marginal_cost` in summary.json is not the system marginal price** | The reported value is `total_variable_cost / total_energy_served` — a cost-weighted average, not the shadow price of the demand constraint. Real UC models extract dual variables (locational marginal prices / LMPs) from the LP relaxation at the solved commitment. This model does not compute LMPs. |
+| **`avg_marginal_cost` in summary.json is not the system marginal price** | The reported value is `total_variable_cost / total_energy_served` - a cost-weighted average, not the shadow price of the demand constraint. Real UC models extract dual variables (locational marginal prices / LMPs) from the LP relaxation at the solved commitment. This model does not compute LMPs. |
 | **Day-ahead actual load used, not a forecast** | Input load is taken from the ENTSO-E "Actual Total Load" column, not a day-ahead forecast. A real day-ahead market clears on forecasts; using actuals gives the model slightly better information than operators would have had at the time of clearing. |
 
 ---
@@ -265,7 +265,7 @@ These are deliberate simplifications. Understanding them is important for interp
 ## Data Sources
 
 ### Load Data
-- **Source:** [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) — *Total Load — Day Ahead / Actual*
+- **Source:** [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) - *Total Load - Day Ahead / Actual*
 - **Area:** DE-LU (Germany / Luxembourg bidding zone)
 - **Period:** 09 May 2026 22:00 CET → 10 May 2026 22:00 CET (covers full delivery day)
 - **File:** `GUI_TOTAL_LOAD_DAYAHEAD_202605092200-202605102200.csv`
@@ -273,7 +273,7 @@ These are deliberate simplifications. Understanding them is important for interp
 - **Intervals used:** First 96 rows after parsing and sorting by timestamp
 
 ### Generation Data
-- **Source:** [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) — *Actual Generation per Production Type*
+- **Source:** [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) - *Actual Generation per Production Type*
 - **Area:** DE-LU
 - **Period:** Same as above
 - **File:** `AGGREGATED_GENERATION_PER_TYPE_GENERATION_202605092200-202605102200.csv`
@@ -316,7 +316,7 @@ These values are **representative estimates** based on publicly available litera
 
 ### Dispatchable Generator Fleet
 
-ETS allowance cost (`ETS_PRICE = 65 €/tonne`) is added to each generator's fuel marginal cost. This reflects the real cash cost German generators face when purchasing EU ETS allowances. At 65 €/tonne, Gas CCGT (86 €/MWh) cleanly dispatches before Hard Coal (87 €/MWh) — the real-world "fuel switching" observed in the German market when ETS prices are elevated. Lignite remains cheaper than gas until ETS reaches ~90–100 €/tonne, which is the policy threshold for full coal phase-out.
+ETS allowance cost (`ETS_PRICE = 65 €/tonne`) is added to each generator's fuel marginal cost. This reflects the real cash cost German generators face when purchasing EU ETS allowances. At 65 €/tonne, Gas CCGT (86 €/MWh) cleanly dispatches before Hard Coal (87 €/MWh) - the real-world "fuel switching" observed in the German market when ETS prices are elevated. Lignite remains cheaper than gas until ETS reaches ~90–100 €/tonne, which is the policy threshold for full coal phase-out.
 
 | Unit | Pmin (MW) | Pmax (MW) | Fuel mc (€/MWh) | ETS @65 (€/MWh) | **Total mc (€/MWh)** | Startup (€) | Ramp (MW/15-min) | Min Up (intervals) | Min Down (intervals) | CO₂ (kg/MWh) |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -330,12 +330,12 @@ ETS allowance cost (`ETS_PRICE = 65 €/tonne`) is added to each generator's fue
 | Gas Peaker (OCGT) | 50 | 5,000 | 98 | 32.5 | **130.5** | 10,000 | 3,500 | 2 | 2 | 500 |
 | Oil | 50 | 1,500 | 130 | 42.3 | **172.3** | 8,000 | 2,000 | 4 | 4 | 650 |
 
-*Table sorted by total mc (merit order). Min Up/Down are in 15-min intervals — e.g. 24 = 6 hours. Lignite Pmax reduced to 8,500 MW to reflect actual DE installed capacity post phase-out closures.*
+*Table sorted by total mc (merit order). Min Up/Down are in 15-min intervals - e.g. 24 = 6 hours. Lignite Pmax reduced to 8,500 MW to reflect actual DE installed capacity post phase-out closures.*
 
 **Notes on specific assumptions:**
 
 - **Pmax values** represent the assumed total installed capacity available for each technology class in Germany, not any single plant. Lignite (8.5 GW) and Gas CCGT (14 GW) reflect approximately the installed fleet sizes as of 2025/2026 after several coal phase-out steps.
-- **Marginal costs** = fuel cost + variable O&M + ETS allowance cost (`ETS_PRICE × co2 / 1000`). Fuel prices assumed: gas ~30 €/MWh, coal ~10 €/MWh, lignite ~3 €/MWh (mid-2026 estimates). ETS set at 65 €/tonne — adjust `ETS_PRICE` in `src/model.py` to test sensitivity (e.g. ETS ~90–100 €/t is where lignite becomes more expensive than gas CCGT).
+- **Marginal costs** = fuel cost + variable O&M + ETS allowance cost (`ETS_PRICE × co2 / 1000`). Fuel prices assumed: gas ~30 €/MWh, coal ~10 €/MWh, lignite ~3 €/MWh (mid-2026 estimates). ETS set at 65 €/tonne - adjust `ETS_PRICE` in `src/model.py` to test sensitivity (e.g. ETS ~90–100 €/t is where lignite becomes more expensive than gas CCGT).
 - **Lignite Pmax** is set to 8,500 MW reflecting Germany's actual installed lignite capacity post phase-out closures (~2025/2026). The original 17,000 MW over-represented available capacity and caused lignite to dominate the dispatch stack unrealistically.
 - **Minimum up/down times** prevent unrealistic single-interval cycling. Values are in 15-min intervals: lignite and waste (24 = 6 h), hard coal and biomass (16 = 4 h), CCGT and coal gas (8 = 2 h up, 4 = 1 h down), gas peaker (2 = 30 min), oil (4 = 1 h), hydro reservoir (1 = 15 min).
 - **Startup costs** are aggregate fleet-level estimates. Real startup costs depend on the number of units started and their cold/warm/hot state.
@@ -351,17 +351,17 @@ ETS allowance cost (`ETS_PRICE = 65 €/tonne`) is added to each generator's fue
 | Max pumping power (`PS_MAX_PUMP`) | `PS_MAX_GEN × 0.85` | Pumps are typically rated slightly below turbine capacity |
 | Pumping efficiency (`η`) | 0.78 | Round-trip efficiency applied on the pump side; typical for older German pumped hydro fleet |
 | Energy capacity (`PS_SOC_MAX`) | `PS_MAX_GEN × 6` MWh | Assumes ~6 hours of full-power discharge, consistent with published capacity for German pumped hydro (~40 GWh total fleet) |
-| Initial state of charge | `PS_SOC_MAX × 0.5` | 50% full at midnight — a neutral starting assumption |
+| Initial state of charge | `PS_SOC_MAX × 0.5` | 50% full at midnight - a neutral starting assumption |
 
 ### Initial Unit State (Warm-Start)
 
-Single-day UC models face a **cold-start problem**: if all units are assumed OFF at `t=0`, baseload generators like lignite must pay their full startup cost each day and commit for their minimum up-time before being allowed to turn off. This is unrealistic — German lignite and biomass plants are typically baseload and were already running continuously the day before.
+Single-day UC models face a **cold-start problem**: if all units are assumed OFF at `t=0`, baseload generators like lignite must pay their full startup cost each day and commit for their minimum up-time before being allowed to turn off. This is unrealistic - German lignite and biomass plants are typically baseload and were already running continuously the day before.
 
 The `WARM_START` set in `src/model.py` solves this by pinning the startup indicator `y[g,0] = 0` for pre-running units. This means:
 
 | Effect | Explanation |
 |---|---|
-| No startup cost at `t=0` | The 80,000 € lignite startup cost is not charged — it was paid on a previous day |
+| No startup cost at `t=0` | The 80,000 € lignite startup cost is not charged - it was paid on a previous day |
 | No forced min_up lock-in from `t=0` | Min_up from the prior day is considered already satisfied; unit can turn off freely within the horizon |
 | Normal commitment constraints from `t=1` onwards | If the unit shuts down and restarts within the horizon, full startup cost and min_up/min_dn apply |
 
