@@ -1,10 +1,10 @@
 {
-  "total_cost_eur": 94381079.66873725,
-  "total_gen_MWh": 1059116.308737502,
-  "ren_gen_MWh": 653257.885502752,
-  "ren_share_pct": 61.679522835547196,
-  "avg_marginal_cost": 89.1130453663227,
-  "total_co2_tonnes": 155412.05422873134,
+  "total_cost_eur": 94967233.00548819,
+  "total_gen_MWh": 1058406.9101875,
+  "ren_gen_MWh": 650457.6460462499,
+  "ren_share_pct": 61.456292450983646,
+  "avg_marginal_cost": 89.72658066703707,
+  "total_co2_tonnes": 156477.8926967624,
   "n_startups": 7,
   "max_slack_MW": 0.0
 }

@@ -34,15 +34,68 @@ ETS_PRICE = 65.0  # €/tonne CO₂ — EU ETS allowance price (~2025/2026 estim
 # min_up/dn : minimum up/down time in 15-min intervals (e.g. 24 = 6 hours)
 # pmin/pmax : MW  |  su: € startup  |  ramp: MW/15-min  |  co2: kgCO2/MWh
 _FLEET = {
-    "Lignite":  dict(pmin=1000, pmax=8500,  fuel_mc=28,  su=80000, ramp=800,  co2=820, min_up=24, min_dn=24),
-    "HardCoal": dict(pmin=500,  pmax=9000,  fuel_mc=38,  su=50000, ramp=900,  co2=760, min_up=16, min_dn=16),
-    "CoalGas":  dict(pmin=100,  pmax=2000,  fuel_mc=45,  su=15000, ramp=1500, co2=550, min_up=8,  min_dn=4),
-    "Gas_CCGT": dict(pmin=300,  pmax=14000, fuel_mc=62,  su=30000, ramp=2000, co2=370, min_up=8,  min_dn=4),
-    "Gas_Peak": dict(pmin=50,   pmax=5000,  fuel_mc=98,  su=10000, ramp=3500, co2=500, min_up=2,  min_dn=2),
-    "Oil":      dict(pmin=50,   pmax=1500,  fuel_mc=130, su=8000,  ramp=2000, co2=650, min_up=4,  min_dn=4),
-    "Biomass":  dict(pmin=300,  pmax=7000,  fuel_mc=18,  su=5000,  ramp=400,  co2=30,  min_up=16, min_dn=16),
-    "Waste":    dict(pmin=100,  pmax=2000,  fuel_mc=15,  su=3000,  ramp=200,  co2=100, min_up=24, min_dn=24),
-    "HydroRes": dict(pmin=0,    pmax=2000,  fuel_mc=8,   su=500,   ramp=2000, co2=0,   min_up=1,  min_dn=1),
+    "Lignite": dict(
+        pmin=1000,
+        pmax=8500,
+        fuel_mc=28,
+        su=80000,
+        ramp=800,
+        co2=820,
+        min_up=24,
+        min_dn=24,
+    ),
+    "HardCoal": dict(
+        pmin=500,
+        pmax=9000,
+        fuel_mc=38,
+        su=50000,
+        ramp=900,
+        co2=760,
+        min_up=16,
+        min_dn=16,
+    ),
+    "CoalGas": dict(
+        pmin=100,
+        pmax=2000,
+        fuel_mc=45,
+        su=15000,
+        ramp=1500,
+        co2=550,
+        min_up=8,
+        min_dn=4,
+    ),
+    "Gas_CCGT": dict(
+        pmin=300,
+        pmax=14000,
+        fuel_mc=62,
+        su=30000,
+        ramp=2000,
+        co2=370,
+        min_up=8,
+        min_dn=4,
+    ),
+    "Gas_Peak": dict(
+        pmin=50, pmax=5000, fuel_mc=98, su=10000, ramp=3500, co2=500, min_up=2, min_dn=2
+    ),
+    "Oil": dict(
+        pmin=50, pmax=1500, fuel_mc=130, su=8000, ramp=2000, co2=650, min_up=4, min_dn=4
+    ),
+    "Biomass": dict(
+        pmin=300, pmax=7000, fuel_mc=18, su=5000, ramp=400, co2=30, min_up=16, min_dn=16
+    ),
+    "Waste": dict(
+        pmin=100,
+        pmax=2000,
+        fuel_mc=15,
+        su=3000,
+        ramp=200,
+        co2=100,
+        min_up=24,
+        min_dn=24,
+    ),
+    "HydroRes": dict(
+        pmin=0, pmax=2000, fuel_mc=8, su=500, ramp=2000, co2=0, min_up=1, min_dn=1
+    ),
 }
 
 GENS = {
@@ -152,7 +205,9 @@ def build_and_solve():
     mdl.ps_soc = pyo.Var(mdl.T, within=pyo.NonNegativeReals, bounds=(0, PS_SOC_MAX))
     mdl.ps_bin = pyo.Var(mdl.T, within=pyo.Binary)
     mdl.sv = pyo.Var(mdl.T, within=pyo.NonNegativeReals)
-    mdl.z  = pyo.Var(mdl.G, mdl.T, within=pyo.Binary)  # shutdown indicator (1 = OFF at t, ON at t-1)
+    mdl.z = pyo.Var(
+        mdl.G, mdl.T, within=pyo.Binary
+    )  # shutdown indicator (1 = OFF at t, ON at t-1)
 
     def obj_rule(m):
         return (
@@ -245,15 +300,15 @@ def build_and_solve():
     print(f"  Variables   : {n_vars:,}")
     print(f"  Constraints : {n_con:,}")
 
-    print("\nSolving (this takes ~5-30 seconds)...")
-    if pyo.SolverFactory("appsi_highs").available():
-        solver = pyo.SolverFactory("appsi_highs")
-        print("  Using HiGHS (pip install highspy)")
-        sol = solver.solve(mdl, tee=False)
-    elif pyo.SolverFactory("gurobi").available():
+    print("\nSolving ...")
+    if pyo.SolverFactory("gurobi").available():
         solver = pyo.SolverFactory("gurobi")
         print("  Using Gurobi")
         sol = solver.solve(mdl, tee=False, options={"TimeLimit": 120, "MIPGap": 0.01})
+    elif pyo.SolverFactory("appsi_highs").available():
+        solver = pyo.SolverFactory("appsi_highs")
+        print("  Using HiGHS (pip install highspy)")
+        sol = solver.solve(mdl, tee=False)
     elif pyo.SolverFactory("cbc").available():
         solver = pyo.SolverFactory("cbc")
         print("  Using CBC")
